@@ -90,20 +90,23 @@ class note_base:
 
     def delete_note(self, deleted_note_id):
         self.execute_request_with_unknown_req_value("DELETE FROM notes WHERE n_id=?",(str(deleted_note_id), ))
+        self.id_correction(deleted_note_id)
         self.made_commit()
         print("[note_base]: deleted note with id = " + str(deleted_note_id) )
-        self.id_correction(deleted_note_id)
+
 
 
     def open_note(self, desired_note_id):
         request_result = self.execute_request_with_unknown_req_value("SELECT * FROM notes WHERE n_id=?",
                                                                      (str(desired_note_id),))
-        the_note_str = request_result.fetchone() #ПРОВЕРКА НА ПУСТОТУ??????
+        the_note_str = request_result.fetchone()
         print("[note_base]: open note with id = " + str(desired_note_id) )
         print(the_note_str)
-        return note.note(the_note_str[0],the_note_str[1],the_note_str[2],the_note_str[3],the_note_str[4],
+        if(the_note_str!=None):
+            return note.note(the_note_str[0],the_note_str[1],the_note_str[2],the_note_str[3],the_note_str[4],
                          the_note_str[5],the_note_str[6],the_note_str[7],the_note_str[8])
-
+        else:
+            return None
 
     def edit_note(self, note_obj = note):
         data_to_update = getattr(note_obj, "_note__note_title"), getattr(note_obj, "_note__the_main_text_of_the_note"), \
@@ -126,7 +129,46 @@ class note_base:
                          getattr(note_obj,"_note__explanation_of_creating_a_link_to_other_notes"), \
                          getattr(note_obj,"_note__list_of_note_tag")
 
-        self.execute_request_with_unknown_req_value("INSERT INTO notes ( hdr, txt, ftype, n_id, l_id,"
+        req = self.open_note(data_to_update[3])
+        if (req==None):
+            self.execute_request_with_unknown_req_value("INSERT INTO notes ( hdr, txt, ftype, n_id, l_id,"
                                                     " s_id, e_id, lce_id, t_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", data_to_update)
+        else:
+            self.edit_note(note_obj)
         self.made_commit()
         print("[note_base]: add note with id = " + str(getattr(note_obj, "_note__note_identifier")))
+
+    def return_tag_by_id(self, tag_id):
+        res_of_req = self.execute_request_with_unknown_req_value("SELECT tag FROM tags WHERE tag_id=?", tag_id)
+        return res_of_req.fetchone()
+
+    def get_free_tag_id_from_tags_table(self):
+        request_result = self.execute_request("SELECT tag_id FROM tags ORDER BY tag_id DESC")
+        max_request_result = request_result.fetchone()
+        if (max_request_result == None):
+            print("[note_base]: free id in tags = 0")
+            return 0
+        else:
+            print("[note_base]: free id in tags = ["+ str(int(max_request_result[0]) + 1) + "]")
+            return (int(max_request_result[0]) + 1)
+    def return_ids_str_by_tags(self, tags_str):
+        splited_tags_str = tags_str.split(" ")
+        result_str = ""
+        fits_to_req = []
+        for tag in splited_tags_str:
+            if(tag.startswith("#")==True):
+                fits_to_req.append(tag)
+        for fit_tag in fits_to_req:
+            res_of_req = self.execute_request_with_unknown_req_value("SELECT tag_id FROM tags WHERE tag=?", fit_tag)
+            req_tag_id = res_of_req.fetchone()
+            if(req_tag_id==None):
+                tag_id = self.get_free_tag_id_from_tags_table()
+                data_to_table = tag_id, fit_tag
+                self.execute_request_with_unknown_req_value("INSERT INTO tags (tag_id, tag) VALUES (?, ?)", data_to_table)
+                result_str+=str(tag_id)
+                result_str+="|"
+            else:
+                result_str += str(req_tag_id)
+                result_str += "|"
+        return result_str
+
