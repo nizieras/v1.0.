@@ -14,7 +14,7 @@ class note_base:
         # сделать id уникальным!!!!!!!! (возможно где-то еще)
         self.execute_request(
             "CREATE TABLE if not exists notes(hdr, txt, ftype, n_id INTEGER, l_id, s_id, e_id, lce_id, t_id)")
-        self.execute_request("CREATE TABLE if not exists tags(tag_id, tag)")
+        self.execute_request("CREATE TABLE if not exists tags(tag_id INTEGER, tag)")
         self.execute_request("CREATE TABLE if not exists excerpts(ex_id, ex)")
         self.execute_request("CREATE TABLE if not exists sources(src_id, src)")
         self.execute_request("CREATE TABLE if not exists recent_tags(tg_id, r_indctr)")
@@ -91,8 +91,26 @@ class note_base:
     def delete_note(self, deleted_note_id):
         self.execute_request_with_unknown_req_value("DELETE FROM notes WHERE n_id=?",(str(deleted_note_id), ))
         self.id_correction(deleted_note_id)
+        self.deleted_note_id_delete_from_link_ids(deleted_note_id)
         self.made_commit()
         print("[note_base]: deleted note with id = " + str(deleted_note_id) )
+
+
+
+    #нужно еще немного потестировать!!!!!!!!!!!!!!!!!!!!!!1
+
+    def deleted_note_id_delete_from_link_ids(self, deleted_note_id):
+        link_ids = self.execute_request("SELECT l_id FROM notes").fetchall()
+        if(link_ids[0]!=None):
+            for link_id in link_ids:
+                if (link_id[0]!=None):
+                    if(link_id[0].find(str(deleted_note_id)+"|")!=-1):
+                        str_to_db = (link_id[0].replace(str(deleted_note_id)+"|",""))
+                        self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE l_id=?",
+                                                                    (str_to_db,link_id[0]))
+                        #записать в базу данных измененную строку
+
+
 
 
 
@@ -152,23 +170,61 @@ class note_base:
             print("[note_base]: free id in tags = ["+ str(int(max_request_result[0]) + 1) + "]")
             return (int(max_request_result[0]) + 1)
     def return_ids_str_by_tags(self, tags_str):
-        splited_tags_str = tags_str.split(" ")
+
+        # А если два тега рядышком написаны??????
+        # проверить на вхождение пробела, если его нет - сразу перейти к записи?????
         result_str = ""
-        fits_to_req = []
-        for tag in splited_tags_str:
-            if(tag.startswith("#")==True):
-                fits_to_req.append(tag)
-        for fit_tag in fits_to_req:
-            res_of_req = self.execute_request_with_unknown_req_value("SELECT tag_id FROM tags WHERE tag=?", fit_tag)
-            req_tag_id = res_of_req.fetchone()
-            if(req_tag_id==None):
-                tag_id = self.get_free_tag_id_from_tags_table()
-                data_to_table = tag_id, fit_tag
-                self.execute_request_with_unknown_req_value("INSERT INTO tags (tag_id, tag) VALUES (?, ?)", data_to_table)
-                result_str+=str(tag_id)
-                result_str+="|"
+        if((tags_str!="")&(tags_str!=None)):
+            if (tags_str.find(" ") == -1):
+                if (tags_str.startwith("#") == True):
+                    tag_for_req = (tags_str,)
+                    res_of_req = self.execute_request_with_unknown_req_value("SELECT tag_id FROM tags WHERE tag=?",
+                                                                             tag_for_req)
+                    req_tag_id = res_of_req.fetchone()
+                    if (req_tag_id == None):
+                        tag_id = self.get_free_tag_id_from_tags_table()
+                        data_to_table = tag_id, tags_str
+                        self.execute_request_with_unknown_req_value("INSERT INTO tags (tag_id, tag) VALUES (?, ?)",
+                                                                    data_to_table)
+                        result_str += str(tag_id)
+                        result_str += "|"
+                    else:
+                        result_str += str(req_tag_id[0])
+                        result_str += "|"
             else:
-                result_str += str(req_tag_id)
-                result_str += "|"
-        return result_str
+                splited_tags_str = tags_str.split(" ")
+                for tag in splited_tags_str:
+                    if (tag.startswith("#") == True):
+                        tag_for_req = (tag,)
+                        res_of_req = self.execute_request_with_unknown_req_value("SELECT tag_id FROM tags WHERE tag=?",
+                                                                                 tag_for_req)
+                        req_tag_id = res_of_req.fetchone()
+                        if (req_tag_id == None):
+                            tag_id = self.get_free_tag_id_from_tags_table()
+                            data_to_table = tag_id, tag
+                            self.execute_request_with_unknown_req_value("INSERT INTO tags (tag_id, tag) VALUES (?, ?)",
+                                                                        data_to_table)
+                            result_str += str(tag_id)
+                            result_str += "|"
+                        else:
+                            result_str += str(req_tag_id[0])
+                            result_str += "|"
+            return result_str
+
+    def get_list_of_links_id(self,not_splited_link_ids):
+        if((not_splited_link_ids==None)|(not_splited_link_ids=="")):
+            return None
+        else:
+            return_list_of_splited_link_id = []
+            splited_links_ids = not_splited_link_ids.split('|')
+            for link_id in splited_links_ids:
+                if((link_id!="")&(len(link_id)>0)):
+                    data_to_req = (link_id,)
+                    req_result = self.execute_request_with_unknown_req_value("SELECT hdr FROM notes WHERE n_id=?", data_to_req)
+                    fetch_req_result = req_result.fetchone()
+                    if(fetch_req_result!=None):
+                        ret_data = (fetch_req_result[0], link_id)
+                        return_list_of_splited_link_id.append(ret_data)
+        return return_list_of_splited_link_id
+
 

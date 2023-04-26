@@ -61,17 +61,30 @@ class note:
         return getattr(self, "_note__explanation_of_creating_a_link_to_other_notes")
 
     def get_list_of_note_tag(self, note_base_obj = note_base):
+        #иногда по непонятным причинам не срабатывает добавление
+        #добавить удаление неиспользуемых тегов перед сохранением заметки??
+        #контроль одного и того же тега
+        #сделать, чтобы отдельная решетка не добавляется!!!!!
 
-        list_of_tags_id = getattr(self, "_note__list_of_note_tag")
-        if(list_of_tags_id!=None):
-            splitted_list_of_note_ids = list_of_tags_id.split("|")
-            note_tags_str = ""
-            for tag_id in splitted_list_of_note_ids:
-                note_tags_str+=note_base_obj.return_tag_by_id(tag_id)[0]
-                note_tags_str+=" "
-            return note_tags_str
-        else:
-            return None
+        if(self.if_object_empty()==False):
+            list_of_tags_id = getattr(self, "_note__list_of_note_tag")
+            if (list_of_tags_id != None):
+                splitted_list_of_note_ids = list_of_tags_id.split("|")
+                note_tags_str = ""
+                for tag_id in splitted_list_of_note_ids:
+                    lllll = len(tag_id)
+                    if ((len(tag_id) > 0) & (tag_id!='')):
+                        tag_for_req = (tag_id,)
+                        res_of_req = note_base_obj.return_tag_by_id(tag_for_req)
+                        if (res_of_req != None):
+                            note_tags_str += res_of_req[0]
+                            note_tags_str += " "
+                return note_tags_str
+            else:
+                return None
+        else: return None
+
+
 
     def get_list_of_note_sources(self):
         return getattr(self, "_note__list_of_note_sources")
