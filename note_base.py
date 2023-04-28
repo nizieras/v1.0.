@@ -87,32 +87,126 @@ class note_base:
         self.made_commit()
         print("[note_base]: id corrected")
 
+    def links_id_correction(self, deleted_note_id):
+        if(deleted_note_id==0):
+            request_result = self.execute_request("SELECT n_id FROM notes ORDER BY n_id DESC")
+            max_request_result = request_result.fetchone()
+            if (max_request_result != None):
+                req_res = self.execute_request("SELECT l_id FROM notes")
+                l_ids = req_res.fetchall()
+                for l_id in l_ids:
+                    if (l_id != None):
+                        if (l_id[0] != None):
+                            str_for_change_str_in_db = ""
+                            splited_l_id = l_id[0].split("|")
+                            for split_l_id in splited_l_id:
+                                if ((split_l_id != "") & (len(split_l_id) > 0)):
+                                    str_for_change_str_in_db += str(int(split_l_id) - 1)
+                                    str_for_change_str_in_db += "|"
+                            self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE l_id=?",
+                                                                        (str_for_change_str_in_db, l_id[0]))
+                            self.made_commit()
+        else:
+            if (deleted_note_id != self.get_free_note_id_from_note_base()):
+                req_res = self.execute_request("SELECT l_id FROM notes")
+                l_ids = req_res.fetchall()
+                for l_id in l_ids:
+                    if (l_id != None):
+                        if (l_id[0] != None):
+                            str_for_change_str_in_db = ""
+                            splited_l_id = l_id[0].split("|")
+                            for split_l_id in splited_l_id:
+                                if ((split_l_id != "") & (len(split_l_id) > 0)):
+                                    if (int(split_l_id) > deleted_note_id):
+                                        str_for_change_str_in_db += str(int(split_l_id) - 1)
+                                        str_for_change_str_in_db += "|"
+                                    else:
+                                        str_for_change_str_in_db += split_l_id
+                                        str_for_change_str_in_db += "|"
+                            self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE l_id=?",
+                                                                        (str_for_change_str_in_db, l_id[0]))
+                            self.made_commit()
+
 
     def delete_note(self, deleted_note_id):
         self.execute_request_with_unknown_req_value("DELETE FROM notes WHERE n_id=?",(str(deleted_note_id), ))
         self.id_correction(deleted_note_id)
         self.deleted_note_id_delete_from_link_ids(deleted_note_id)
+        self.links_id_correction(deleted_note_id)
         self.made_commit()
         print("[note_base]: deleted note with id = " + str(deleted_note_id) )
 
-
-
     #нужно еще немного потестировать!!!!!!!!!!!!!!!!!!!!!!1
-
     def deleted_note_id_delete_from_link_ids(self, deleted_note_id):
         link_ids = self.execute_request("SELECT l_id FROM notes").fetchall()
-        if(link_ids[0]!=None):
-            for link_id in link_ids:
-                if (link_id[0]!=None):
-                    if(link_id[0].find(str(deleted_note_id)+"|")!=-1):
-                        str_to_db = (link_id[0].replace(str(deleted_note_id)+"|",""))
-                        self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE l_id=?",
-                                                                    (str_to_db,link_id[0]))
-                        #записать в базу данных измененную строку
+        if(link_ids!=None):
+                for link_id in link_ids:
+                    if (link_id[0] != None):
+                        if (link_id[0].find(str(deleted_note_id) + "|") != -1):
+                            str_to_db = (link_id[0].replace(str(deleted_note_id) + "|", ""))
+                            self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE l_id=?",
+                                                                        (str_to_db, link_id[0]))
+                            self.made_commit()
+                            # записать в базу данных измененную строку
 
+    def add_link_id_in_db(self, link_id, note_id):
+        l_id = self.execute_request_with_unknown_req_value("SELECT l_id FROM notes WHERE n_id=?",
+                                                           (str(note_id),)).fetchone()
+        str_l_id = l_id[0]
+        if (str_l_id != None):
+            str_l_id += str(link_id)
+            str_l_id += "|"
+        else:
+            str_l_id = str(link_id)
+            str_l_id += "|"
 
+        self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE n_id=?",
+                                                    (str_l_id, str(note_id)))
+        self.made_commit()
 
+        n_id = self.execute_request_with_unknown_req_value("SELECT l_id FROM notes WHERE n_id=?",
+                                                           (str(link_id),)).fetchone()
+        str_n_id = n_id[0]
+        if (str_n_id != None):
+            str_n_id += str(note_id)
+            str_n_id += "|"
+        else:
+            str_n_id = str(note_id)
+            str_n_id += "|"
 
+        self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE n_id=?",
+                                                    (str_n_id, str(link_id)))
+
+        self.made_commit()
+        return str_l_id
+
+    def del_link_id_in_db(self, del_link_id, note_id, splited_link_ids):
+        update_str = ""
+        if(splited_link_ids!=None):
+            for splited_link in splited_link_ids:
+                if(splited_link!=str(del_link_id)):
+                    update_str+= splited_link
+                    update_str+="|"
+
+        self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE n_id=?",
+                                                    (update_str, str(note_id)))
+        self.made_commit()
+
+        note_obj = self.open_note(del_link_id)
+        dli_splited_link_id = note_obj.get_the_list_of_links_to_other_splitted()
+        dli_update_str = ""
+
+        if(dli_splited_link_id!=None):
+            for splited_link in dli_splited_link_id:
+                if(splited_link!=str(note_id)):
+                    dli_update_str+= splited_link
+                    dli_update_str+="|"
+
+        self.execute_request_with_unknown_req_value("UPDATE notes SET l_id=? WHERE n_id=?",
+                                                    (dli_update_str, str(del_link_id)))
+
+        self.made_commit()
+        return update_str
 
     def open_note(self, desired_note_id):
         request_result = self.execute_request_with_unknown_req_value("SELECT * FROM notes WHERE n_id=?",
@@ -211,6 +305,7 @@ class note_base:
                             result_str += "|"
             return result_str
 
+# возвращает несколько одинаковых чисел....
     def get_list_of_links_id(self,not_splited_link_ids):
         if((not_splited_link_ids==None)|(not_splited_link_ids=="")):
             return None

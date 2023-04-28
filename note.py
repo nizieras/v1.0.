@@ -57,6 +57,15 @@ class note:
     def get_the_list_of_links_to_other_notes(self):
         return getattr(self, "_note__list_of_links_to_other_notes")
 
+    def get_the_list_of_links_to_other_splitted(self):
+        splitted_l_ids = []
+        if((self.__list_of_links_to_other_notes!=None)&(self.__list_of_links_to_other_notes!="")):
+            spited_link_ids = self.__list_of_links_to_other_notes.split("|")
+            for split_id in spited_link_ids:
+                if(len(split_id)>0):
+                    splitted_l_ids.append(split_id)
+        return splitted_l_ids
+
     def get_explanation_of_creating_a_link_to_other_notes(self):
         return getattr(self, "_note__explanation_of_creating_a_link_to_other_notes")
 
@@ -84,13 +93,14 @@ class note:
                 return None
         else: return None
 
-
-
     def get_list_of_note_sources(self):
         return getattr(self, "_note__list_of_note_sources")
 
     def get_excerpt_from_the_source_for_clarification(self):
         return getattr(self, "_note__excerpt_from_the_source_for_clarification")
+
+    def update_list_of_links_to_other_notes(self, new_list_of_links):
+        self.__list_of_links_to_other_notes = new_list_of_links
 
 
 
