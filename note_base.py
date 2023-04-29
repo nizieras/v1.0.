@@ -322,4 +322,21 @@ class note_base:
                         return_list_of_splited_link_id.append(ret_data)
         return return_list_of_splited_link_id
 
+    def find_accordance_in_db(self, searching_str):
+        self.execute_request("CREATE VIRTUAL TABLE if not exists search USING fts5(header, text, tags, n_id)")
+        main_values = self.execute_request("SELECT hdr, txt, n_id, t_id FROM notes").fetchall()
+
+        for value in main_values:
+            note_obj = self.open_note(int(value[2]))
+            tag_str = note_obj.get_list_of_note_tag(self)
+            data_to_insert = (value[0], value[1], tag_str ,value[2])
+            self.execute_request_with_unknown_req_value("INSERT INTO search(header, text, tags, n_id) VALUES(?, ?, ?, ?)",
+                                                        data_to_insert)
+            self.made_commit()
+        req_res = self.execute_request_with_unknown_req_value(
+            "SELECT header, n_id FROM search WHERE search MATCH ? ORDER BY rank", (searching_str+"*",)).fetchall()
+        if (req_res==None):
+            req_res = self.execute_request_with_unknown_req_value(
+                "SELECT header, n_id FROM search WHERE search MATCH ? ORDER BY rank", ("^" + searching_str,)).fetchall()
+        return req_res
 

@@ -1,10 +1,14 @@
 import note
 import note_base
 import customtkinter
+import tkinter
 
+global app
 global destroing_add_link_window
 global button_frame
+global find_button_frame
 global menu_frame
+global find_menu_frame
 global text_frame
 global links_frame
 # #объект заметки, с которой идет работа прямо сейчас
@@ -13,6 +17,65 @@ current_note = note.note(None,None,None,None,None,None,None,None,None)
 current_db = note_base.note_base('note_organization_base.db')
 
 #определить цвета как глобальные переменные!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+class FindButtonForButtonFrame():
+    def __init__(self, index, master, text):
+        self.__index = index
+
+        # вот здесь можно добавить /n и тогда заголовок будет отображаться в 2 строчки
+        strlen = 58
+        if(text!=None):
+            if (len(text) > strlen):
+                out = text[0:strlen + 1] + " ..."
+                text = out
+
+        self.button = customtkinter.CTkButton(master=master, width=460, height=40, command=self.button_call,
+                                                  text=text, hover=True, anchor="w", fg_color="#636363")
+
+    def button_call(self):
+        print(self.__index)
+        global menu_frame
+        menu_frame.button_add_call()
+
+        global current_note
+        global current_db
+        global text_frame
+        text_frame.clean_box()
+        current_note = current_db.open_note(self.__index)
+        text_frame.update_data_in_text_box(current_note)
+
+class FindButtonFrame(customtkinter.CTkScrollableFrame):
+    def __init__(self, master, **kwargs, ):
+
+        super().__init__(master, **kwargs)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.buttons = []
+        header_and_id_list = []
+        self.update_buttons(header_and_id_list)
+
+    def update_buttons(self, header_and_id_list):
+        if (len(self.buttons)>0):
+            for button in self.buttons:
+                button.button.destroy()
+            self.buttons.clear()
+        if(len(header_and_id_list)>0):
+            exist_flag = False
+            exist_ids = []
+            for header_and_id in header_and_id_list:
+                for exist_id in exist_ids:
+                    if(header_and_id[1]==exist_id):
+                        exist_flag = True
+                if(exist_flag==False):
+                    self.buttons.append(
+                        FindButtonForButtonFrame(header_and_id[1], self, header_and_id[0]))
+                exist_flag = False
+                exist_ids.append(header_and_id[1])
+            row = 0
+            for c in self.buttons:
+                c.button.grid(row=row, column=0, padx=4, pady=4, sticky="nsew")
+                row += 1
+
 class ToplevelDelLink(customtkinter.CTkToplevel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -167,10 +230,6 @@ class LinkButtonFrame(customtkinter.CTkScrollableFrame):
         for c in self.buttons:
             c.button.grid(row=row, column=0, padx=4, pady=4, sticky="nsew")
             row += 1
-
-
-
-
 
 class ButtonForButtonFrame():
     def __init__(self, index, master, text):
@@ -410,7 +469,8 @@ class MenuFrame(customtkinter.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.segemented_button = customtkinter.CTkSegmentedButton(master=self,
                                                              values=["Удалить заметку", "Добавить заметку", "Удалить ссылку", "Добавить ссылку"],
-                                                             command=self.segmented_button_callback)
+                                                             command=self.segmented_button_callback,
+                                                             height=25)
         self.segemented_button.grid(row=0, column=0, columnspan=2, padx=0, pady=0, sticky="nsew")
 
 
@@ -509,8 +569,10 @@ class MenuFrame(customtkinter.CTkFrame):
                 data_to_change.append("txt")
                 current_note.change_object(data_to_change)
                 current_db.add_note(current_note)
-                button_frame.update_buttons()
+                if(button_frame!=None):
+                    button_frame.update_buttons()
                 links_frame.update_links_buttons()
+
         else:
             data_to_change = text_frame.return_data_for_note_obj()
             data_to_change.append(current_note.get_note_id())
@@ -519,7 +581,8 @@ class MenuFrame(customtkinter.CTkFrame):
             current_db.add_note(current_note)
             current_note.clean_object()  # кажется, вот эта строка мне мешает слегка
             text_frame.clean_box()
-            button_frame.update_buttons()
+            if (button_frame != None):
+                button_frame.update_buttons()
             links_frame.update_links_buttons()
 
         # кнопка работает когда приложение только что открыли или удалили заметку (т.е. объект заметки пустой)
@@ -539,7 +602,26 @@ class MenuFrame(customtkinter.CTkFrame):
         # если есть изменения - записать объект в базу и очистить текущий объект, очистить текстбоксы, обновить кнопки.
         print("Add")
 
+class FindMenuFrame(customtkinter.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.entry_variable = tkinter.StringVar()
+        self.entry = customtkinter.CTkEntry(master=self,
+                                       width=120,
+                                       height=25,
+                                       textvariable=self.entry_variable)
+        self.entry.bind(sequence='<Return>', command=self.search_accordance)
+        self.entry.grid(row=0, column=0, columnspan=2, padx=0, pady=0, sticky="nsew")
 
+    def search_accordance(self, *args):
+        global current_db
+        global find_button_frame
+        str_for_search = self.entry_variable.get()
+        headers_and_id_list = current_db.find_accordance_in_db(str_for_search)
+        find_button_frame.update_buttons(headers_and_id_list)
+        print(self.entry_variable.get())
 
 class WindowFrame(customtkinter.CTkFrame):
     def __init__(self, master, **kwargs):
@@ -553,9 +635,25 @@ class WindowFrame(customtkinter.CTkFrame):
         self.segemented_button.set("Главная")  # set initial value
         self.segemented_button.grid(row=0, column=0, columnspan=2, padx=0, pady=0, sticky="nsew")
 
-    def segmented_button_callback(value):
-        print("segmented button clicked:", value)
 
+    def segmented_button_callback(self, value):
+        global app
+        global menu_frame
+        global find_menu_frame
+        if(value=="Главная"):
+            menu_frame.button_add_call() # возможно здесь сделать просто save, чтобы состояние объекта сохранилось  и при переходе
+                                         # к главной вкладке можно было бы просто продолжить редактирование
+            app.change_button_frame(value)
+            app.change_menu_frame(value)
+
+        if (value == "Поиск"):
+            menu_frame.button_add_call()
+            app.change_button_frame(value)
+            app.change_menu_frame(value)
+
+        if (value == "Генерация"):
+            pass
+        print("segmented button clicked:", value)
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -590,8 +688,49 @@ class App(customtkinter.CTk):
         self.my_button_frame = button_frame
         self.my_button_frame.grid(row=2, column=0, padx=4, pady=4, sticky="nsew")
 
+    def change_button_frame(self, initialize_type):
+        self.my_button_frame.destroy()
+        self.initialize_button_frame(initialize_type)
+        self.my_button_frame.grid(row=2, column=0, padx=4, pady=4, sticky="nsew")
+
+    def initialize_button_frame(self, initialize_type):
+        global button_frame
+        global find_button_frame
+
+        if(initialize_type=="Главная"):
+            button_frame = ButtonFrame(master=self, width=0, height=0)
+            self.my_button_frame = button_frame
+            find_button_frame = None
+
+        if(initialize_type=="Поиск"):
+            find_button_frame = FindButtonFrame(master=self, width=0, height=0)
+            self.my_button_frame = find_button_frame
+            button_frame = None
+
+    def change_menu_frame(self, initialize_type):
+
+        self.my_menu_frame.destroy()
+        self.initialize_menu_frame(initialize_type)
+        self.my_menu_frame.grid(row=1, column=0, columnspan=2, padx=4, pady=4, sticky="nsew")
+
+    def initialize_menu_frame(self, initialize_type):
+        global menu_frame
+        global find_menu_frame
+
+        if(initialize_type=="Главная"):
+            menu_frame = MenuFrame( master=self, width=100, height=40)
+            self.my_menu_frame = menu_frame
+            # find_menu_frame = None
+
+        if(initialize_type=="Поиск"):
+            find_menu_frame = FindMenuFrame(master=self, width=100, height=40)
+            self.my_menu_frame = find_menu_frame
+            # menu_frame = None
+
+
 
 if __name__ == "__main__":
+    global app
     app = App()
     app.mainloop()
 
