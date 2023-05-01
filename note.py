@@ -35,15 +35,24 @@ class note:
             return False
 
     def change_object(self, data_to_change):
-        self.__note_title = data_to_change[0]
-        self.__the_main_text_of_the_note = data_to_change[1]
-        self.__list_of_links_to_other_notes = data_to_change[2]
-        self.__explanation_of_creating_a_link_to_other_notes = data_to_change[3]
-        self.__list_of_note_tag = data_to_change[4]
-        self.__list_of_note_sources = data_to_change[5]
-        self.__excerpt_from_the_source_for_clarification = data_to_change[6]
-        self.__note_identifier = data_to_change[7]
-        self.__note_file_type = data_to_change[8]
+        if(len(data_to_change)>0):
+            self.__note_title = data_to_change[0]
+        if (len(data_to_change) > 1):
+            self.__the_main_text_of_the_note = data_to_change[1]
+        if (len(data_to_change) > 2):
+            self.__list_of_links_to_other_notes = data_to_change[2]
+        if (len(data_to_change) > 3):
+            self.__explanation_of_creating_a_link_to_other_notes = data_to_change[3]
+        if (len(data_to_change) > 4):
+            self.__list_of_note_tag = data_to_change[4]
+        if (len(data_to_change) > 5):
+            self.__list_of_note_sources = data_to_change[5]
+        if (len(data_to_change) > 6):
+            self.__excerpt_from_the_source_for_clarification = data_to_change[6]
+        if (len(data_to_change) > 7):
+            self.__note_identifier = data_to_change[7]
+        if (len(data_to_change) > 8):
+            self.__note_file_type = data_to_change[8]
 
     def get_note_id(self):
         return getattr(self,"_note__note_identifier")
@@ -81,7 +90,6 @@ class note:
                 splitted_list_of_note_ids = list_of_tags_id.split("|")
                 note_tags_str = ""
                 for tag_id in splitted_list_of_note_ids:
-                    lllll = len(tag_id)
                     if ((len(tag_id) > 0) & (tag_id!='')):
                         tag_for_req = (tag_id,)
                         res_of_req = note_base_obj.return_tag_by_id(tag_for_req)

@@ -2,21 +2,164 @@ import note
 import note_base
 import customtkinter
 import tkinter
+import generator
 
 global app
 global destroing_add_link_window
 global button_frame
+global button_and_tag_frame
 global find_button_frame
 global menu_frame
 global find_menu_frame
+global type_and_find_menu_frame
 global text_frame
 global links_frame
+generation = generator.Generation()
 # #объект заметки, с которой идет работа прямо сейчас
 current_note = note.note(None,None,None,None,None,None,None,None,None)
 #объект базы заметок, с которым происходит работа
 current_db = note_base.note_base('note_organization_base.db')
 
 #определить цвета как глобальные переменные!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+class ButtonAndTagButtonForFrame():
+    def __init__(self, index, master, text, tag_or_note):
+        self.__index = index
+        self.__tag_or_note = tag_or_note
+        self.__text = text
+
+        # вот здесь можно добавить /n и тогда заголовок будет отображаться в 2 строчки
+        strlen = 58
+        if(text!=None):
+            if (len(text) > strlen):
+                out = text[0:strlen + 1] + " ..."
+                text = out
+
+        self.button = customtkinter.CTkButton(master=master, width=460, height=40, command=self.button_call,
+                                                  text=text, hover=True, anchor="w", fg_color="#636363")
+
+    def button_call(self):
+        print(self.__index)
+        global menu_frame
+        menu_frame.button_add_call()
+        global generation
+        global current_note
+        global current_db
+        global text_frame
+        text_frame.clean_box()
+        str_for_gen = ""
+        data_to_update = []
+        if(self.__tag_or_note=="note"):
+            current_note = current_db.open_note(self.__index)
+            note_title = current_note.get_note_title()
+            data_to_update.append("Создано NOA на основе заметки с темой: '" + note_title + "'")
+            str_for_gen = current_note.get_the_main_text_of_the_note()
+            if(len(str_for_gen)>500):
+                str_for_gen = str_for_gen[0:500]
+        if (self.__tag_or_note == "tag"):
+            data_to_update.append("Создано NOA на основе тега: '" + current_db.return_tag_by_id((self.__index,))[0] + "'")
+            result_tag_text = current_db.get_txts_by_tag(str(self.__index))
+            if(len(result_tag_text)>0):
+                for result in result_tag_text:
+                    if(len(str_for_gen)<500):
+                        str_for_gen+=result
+                if(len(str_for_gen)>500):
+                    str_for_gen = str_for_gen[0:500]
+            else:
+                str_for_gen = self.__text
+        result_str = generation.generate(str_for_gen)
+        data_to_update.append(result_str)
+        current_note.change_object(data_to_update)
+        text_frame.update_data_in_text_box(current_note)
+
+class ButtonAndTagFrame(customtkinter.CTkScrollableFrame):
+    def __init__(self, master, **kwargs):
+
+        super().__init__(master, **kwargs)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.buttons = []
+
+    def update_buttons(self, tag_or_note):
+        global current_db
+        if (len(self.buttons)>0):
+            for button in self.buttons:
+                button.button.destroy()
+            self.buttons.clear()
+        if(tag_or_note=="tag"):
+            tags = current_db.get_the_list_of_tags()
+            if(tags!=None):
+                for tag in tags:
+                    self.buttons.append(ButtonAndTagButtonForFrame(tag[0],self,tag[1], tag_or_note))
+        if (tag_or_note == "note"):
+            texts = current_db.execute_request("SELECT hdr, n_id FROM notes ORDER BY n_id")
+            for text in texts:
+                self.buttons.append(
+                    ButtonAndTagButtonForFrame(text[1], self, text[0], tag_or_note ))
+        row = 0
+        for c in self.buttons:
+            c.button.grid(row=row, column=0, padx=4, pady=4, sticky="nsew")
+            row += 1
+
+class TypeAndFindMenuFrame(customtkinter.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        self.entry_variable = tkinter.StringVar()
+        self.entry = customtkinter.CTkEntry(master=self,
+                                       width=120,
+                                       height=25,
+                                       state = "disabled",
+                                       textvariable=self.entry_variable)
+        self.entry.bind(sequence='<Return>', command=self.search_accordance)
+        self.entry.grid(row=0, column=0, columnspan=2, padx=4, pady=0, sticky="nsew")
+
+        self.segemented_button = customtkinter.CTkSegmentedButton(master=self,
+                                                             values=["По тегу", "По открытой заметке", "По теме"],
+                                                             command=self.segmented_button_callback)
+        self.segemented_button.set("")  # set initial value
+        self.segemented_button.grid(row=1, column=0, columnspan=2, padx=4, pady=4, sticky="nsew")
+
+    def segmented_button_callback(self, value):
+        global current_note
+        global menu_frame
+        global button_and_tag_frame
+        menu_frame.button_add_call()
+        if(value=="По тегу"):
+            self.entry.configure(state="disabled")
+            button_and_tag_frame.update_buttons("tag")
+        if(value=="По открытой заметке"):
+            self.entry.configure(state="disabled")
+            button_and_tag_frame.update_buttons("note")
+        if(value=="По теме"):
+            self.entry.configure(state="normal")
+        print(value)
+
+    def search_accordance(self, *args):
+        global menu_frame
+        global text_frame
+        menu_frame.button_add_call()
+        text_frame.clean_box()
+        global current_db
+        global find_button_frame
+        global generation
+        global current_note
+        str_for_generate = self.entry_variable.get()
+        data_to_update = []
+        data_to_update.append("Создано NOA на основе темы: '" + str_for_generate + "'")
+
+        # Возможно в этом месте поискать что-то в заметках пользователя
+        # и наверное стоит добавить многопоточность
+
+        result_str = generation.generate(str_for_generate)
+        data_to_update.append(result_str)
+        current_note.change_object(data_to_update)
+        text_frame.update_data_in_text_box(current_note)
+
+        print(result_str)
 
 class FindButtonForButtonFrame():
     def __init__(self, index, master, text):
@@ -66,6 +209,7 @@ class FindButtonFrame(customtkinter.CTkScrollableFrame):
                 for exist_id in exist_ids:
                     if(header_and_id[1]==exist_id):
                         exist_flag = True
+                        break
                 if(exist_flag==False):
                     self.buttons.append(
                         FindButtonForButtonFrame(header_and_id[1], self, header_and_id[0]))
@@ -641,18 +785,22 @@ class WindowFrame(customtkinter.CTkFrame):
         global menu_frame
         global find_menu_frame
         if(value=="Главная"):
-            menu_frame.button_add_call() # возможно здесь сделать просто save, чтобы состояние объекта сохранилось  и при переходе
+             # возможно здесь сделать просто save, чтобы состояние объекта сохранилось  и при переходе
                                          # к главной вкладке можно было бы просто продолжить редактирование
             app.change_button_frame(value)
             app.change_menu_frame(value)
+            menu_frame.button_add_call()
 
         if (value == "Поиск"):
-            menu_frame.button_add_call()
+
             app.change_button_frame(value)
             app.change_menu_frame(value)
+            menu_frame.button_add_call()
 
         if (value == "Генерация"):
-            pass
+            app.change_button_frame(value)
+            app.change_menu_frame(value)
+            menu_frame.button_add_call()
         print("segmented button clicked:", value)
 
 class App(customtkinter.CTk):
@@ -696,16 +844,20 @@ class App(customtkinter.CTk):
     def initialize_button_frame(self, initialize_type):
         global button_frame
         global find_button_frame
+        global button_and_tag_frame
 
         if(initialize_type=="Главная"):
             button_frame = ButtonFrame(master=self, width=0, height=0)
             self.my_button_frame = button_frame
-            find_button_frame = None
 
         if(initialize_type=="Поиск"):
             find_button_frame = FindButtonFrame(master=self, width=0, height=0)
             self.my_button_frame = find_button_frame
-            button_frame = None
+
+        if (initialize_type == "Генерация"):
+            button_and_tag_frame = ButtonAndTagFrame(master=self, width=0, height=0)
+            self.my_button_frame = button_and_tag_frame
+
 
     def change_menu_frame(self, initialize_type):
 
@@ -716,16 +868,19 @@ class App(customtkinter.CTk):
     def initialize_menu_frame(self, initialize_type):
         global menu_frame
         global find_menu_frame
+        global type_and_find_menu_frame
 
         if(initialize_type=="Главная"):
             menu_frame = MenuFrame( master=self, width=100, height=40)
             self.my_menu_frame = menu_frame
-            # find_menu_frame = None
 
         if(initialize_type=="Поиск"):
             find_menu_frame = FindMenuFrame(master=self, width=100, height=40)
             self.my_menu_frame = find_menu_frame
-            # menu_frame = None
+
+        if (initialize_type == "Генерация"):
+            type_and_find_menu_frame = TypeAndFindMenuFrame(master=self, width=100, height=40)
+            self.my_menu_frame = type_and_find_menu_frame
 
 
 

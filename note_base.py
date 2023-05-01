@@ -334,9 +334,28 @@ class note_base:
                                                         data_to_insert)
             self.made_commit()
         req_res = self.execute_request_with_unknown_req_value(
-            "SELECT header, n_id FROM search WHERE search MATCH ? ORDER BY rank", (searching_str+"*",)).fetchall()
+            "SELECT header, n_id FROM search WHERE search MATCH ? ORDER BY rank", (searching_str + "*",)).fetchall()
         if (req_res==None):
             req_res = self.execute_request_with_unknown_req_value(
                 "SELECT header, n_id FROM search WHERE search MATCH ? ORDER BY rank", ("^" + searching_str,)).fetchall()
+        if (req_res==None):
+            req_res = self.execute_request_with_unknown_req_value(
+                "SELECT header, n_id FROM search WHERE search MATCH ? ORDER BY rank", ("^" + searching_str + "*",)).fetchall()
+        self.execute_request("DROP TABLE search")
+
         return req_res
+
+    def get_txts_by_tag(self, tag_id):
+        result = []
+        req_res = self.execute_request("SELECT t_id, txt FROM notes").fetchall()
+        for res in req_res:
+            if(res[0]!=None):
+                str_for_search = res[0]
+                if (str_for_search.find(tag_id) !=-1):
+                    result.append(res[1])
+        return result
+
+    def get_the_list_of_tags(self):
+        res_of_req = self.execute_request("SELECT * FROM tags").fetchall()
+        return res_of_req
 
